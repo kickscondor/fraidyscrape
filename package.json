@@ -1,0 +1,23 @@
+{
+  "name": "fraidyscrape",
+  "description": "Scrape HTML and JSON APIs using JSON definition files.",
+  "version": "1.0.0",
+  "module": "index.js",
+  "license": "MIT",
+  "repository": "kickscondor/fraidyscrape",
+  "author": "Kicks Condor",
+  "bin": {
+    "scrape": "./bin/scrape"
+  },
+  "dependencies": {
+    "json-date-parser": "^1.0.1",
+    "jsonpath-plus": "^1.1.0",
+    "normalize-url": "^4.5.0"
+  },
+  "devDependencies": {
+    "cheerio": "^1.0.0-rc.3",
+    "node-fetch": "^2.6.0",
+    "xmldom": "^0.1.27",
+    "xpath": "0.0.27"
+  }
+}
