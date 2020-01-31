@@ -5,14 +5,15 @@
 // var scraper = new fraidyscrape(options)
 // scraper.
 //
-const { JSONPath } = require('jsonpath-plus')
+// const { JSONPath } = require('jsonpath-plus')
+const jp = require('jsonpath')
 const normalizeUrl = require('normalize-url')
 const urlp = require('url')
 
 module.exports = F
 
 function F (options, ext) {
-  if (!(this instanceof F)) return new F (options)
+  if (!(this instanceof F)) return new F (options, ext)
   for (let id in options) {
     let site = options[id]
     if (site.match) {
@@ -94,7 +95,9 @@ F.prototype.nextRequest = function (tasks) {
 
   let id = tasks.queue.shift()
   let req = this.options[id]
-  let options = this.assign({}, {url: req.url || tasks.vars.url}, tasks.vars)
+  let options = this.assign({},
+    {url: req.url || tasks.vars.url, headers: {'User-Agent': 'curl/7.58.0'}, credentials: 'omit'},
+    tasks.vars)
   if (this.options.domains) {
     this.assign(options, this.options.domains[urlp.parse(options.url).hostname], tasks.vars)
   }
@@ -120,7 +123,7 @@ F.prototype.scanScript = function (vars, script, pathFn) {
     if (cmd.match && val && (match = val.match(new RegExp(cmd.match))) !== null) {
       val = match[1]
     }
-    if (cmd.acceptJson || cmd.acceptHtml || cmd.acceptXml) {
+    if (cmd.acceptJson || cmd.acceptHtml) {
       let v = vars
       if (cmd.var) {
         vars = Object.assign({}, vars)
@@ -162,48 +165,21 @@ F.prototype.scan = async function (vars, site, res) {
   if (obj && typeof(obj.text) === 'function')
     obj = await obj.text()
   if (site.acceptJson) {
+    console.log(obj)
     if (typeof(obj) === 'string')
       obj = JSON.parse(obj, jsonDateParser)
     script = site.acceptJson
     fn = (path) => {
-      let found = JSONPath({path, json: obj})
-      return found && found[0]
+      // let found = JSONPath({path, json: obj})
+      // return found && found[0]
+      return jp.value(obj, path)
     }
 
   } else if (site.acceptHtml) {
     if (typeof(obj) === 'string')
       obj = this.parseHtml(obj)
     script = site.acceptHtml
-    fn = (path) => {
-      let sel = obj, funk = null, attr = null, match = null
-      if ((match = path.match(/^(.*):(\S+)$/)) !== null) {
-        path = match[1].trim()
-        funk = match[2]
-      } else if ((match = path.match(/^(.*)@(\S+)$/)) !== null) {
-        path = match[1].trim()
-        attr = match[2]
-      }
-
-      if (path.length > 0)
-        sel = this.searchHtml(obj, path)
-      else
-        sel = this.parseHtml(obj)
-
-      if (sel) {
-        if (funk)
-          return sel.map(x => x[funk]()).toArray().join()
-        if (attr)
-          return sel.attr(attr)
-
-        return this.htmlToArray(sel)
-      }
-    }
-
-  } else if (site.acceptXml) {
-    if (typeof(obj) === 'string')
-      obj = this.parseXml(obj)
-    script = site.acceptXml
-    fn = (path) => this.searchXml(obj, path)
+    fn = (path) => this.searchHtml(obj, path)
   }
 
   if (obj instanceof Array) {
@@ -223,5 +199,7 @@ F.prototype.scan = async function (vars, site, res) {
 
 F.prototype.scrape = async function (tasks, req, res) {
   let site = this.options[req.id]
-  return this.scan(tasks.vars, site, res)
+  let vars = this.scan(tasks.vars, site, res)
+  vars.rule = req.id
+  return vars
 }

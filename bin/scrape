@@ -10,13 +10,10 @@ const dom = require('xmldom').DOMParser;
 (async function () {
   var url = process.argv[3], req
   var scraper = new fraidyscrape(JSON.parse(fs.readFileSync(process.argv[2])), {
-    parseHtml: str => cheerio(str),
-    searchHtml: (node, path) => cheerio(path, node),
-    htmlToArray: node => node.toArray(),
-    parseXml: str => {
+    parseHtml: str => {
       return new dom().parseFromString(str, 'text/xml')
     },
-    searchXml: (node, path) => {
+    searchHtml: (node, path) => {
       let x = xpath.parse(path).select({node, allowAnyNamespaceForNoPrefix: true})
       if (x && path.slice(-1) !== "]") {
         return x.map(node => node.textContent).join().trim()

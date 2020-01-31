@@ -9,14 +9,25 @@
   "bin": {
     "scrape": "./bin/scrape"
   },
+  "scripts": {
+    "build": "parcel build webext/manifest.json"
+  },
   "dependencies": {
     "json-date-parser": "^1.0.1",
+    "jsonpath": "^1.0.2",
     "jsonpath-plus": "^1.1.0",
     "normalize-url": "^4.5.0"
   },
   "devDependencies": {
+    "babel-polyfill": "^6.26.0",
     "cheerio": "^1.0.0-rc.3",
     "node-fetch": "^2.6.0",
+    "parcel-bundler": "^1.12.4",
+    "parcel-plugin-web-extension": "^1.6.1",
+    "pretty-print-json": "^0.2.0",
+    "sass": "^1.25.0",
+    "umbrellajs": "^3.1.0",
+    "webextension-polyfill": "^0.6.0",
     "xmldom": "^0.1.27",
     "xpath": "0.0.27"
   }
