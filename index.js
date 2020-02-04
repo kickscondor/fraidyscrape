@@ -49,6 +49,7 @@ F.prototype.detect = function (url) {
     let queue = (site.depends || []).concat([id])
     return {queue, vars}
   }
+  return {queue: ["default"], vars: {url}}
 }
 
 function varx(str, vars) {
@@ -77,6 +78,8 @@ F.prototype.assign = function (options, additions, vars, mods) {
           val = new Date(val)
         } else if (trans === 'int') {
           val = Number(val)
+        } else if (trans === 'slug') {
+          val = '#' + encodeURIComponent(val)
         } else if (trans === 'url') {
           val = urlp.resolve(vars['url'], val)
         } else if (trans.startsWith('*')) {
@@ -95,11 +98,16 @@ F.prototype.nextRequest = function (tasks) {
 
   let id = tasks.queue.shift()
   let req = this.options[id]
+  let headers = {}
+  if (this.options.agent) {
+    headers['User-Agent'] = this.options.agent
+  }
   let options = this.assign({},
-    {url: req.url || tasks.vars.url, headers: {'User-Agent': 'curl/7.58.0'}, credentials: 'omit'},
+    {url: req.url || tasks.vars.url, headers, credentials: 'omit'},
     tasks.vars)
   if (this.options.domains) {
-    this.assign(options, this.options.domains[urlp.parse(options.url).hostname], tasks.vars)
+    this.assign(options, this.options.domains[urlp.parse(options.url).hostname],
+      tasks.vars)
   }
 
   // TODO: Actually batch
@@ -115,33 +123,75 @@ F.prototype.nextRequest = function (tasks) {
   return {url: urlp.format(url), id, options}
 }
 
-F.prototype.scanScript = function (vars, script, pathFn) {
+//
+// Run a series of commands, populating 'vars'.
+//
+// vars: The hash to store output in.
+// script: The list of commands.
+// gg: Global settings
+// pathFn: The function to use for xpath or jsonpath or whatever.
+//
+//
+F.prototype.scanScript = async function (vars, script, gg, node, pathFn) {
   for (let i = 0; i < script.length; i++) {
     let cmd = script[i]
-    let op = varx(cmd.op, vars)
-    let val = op[0] === '=' ? op.slice(1) : pathFn(op)
-    if (cmd.match && val && (match = val.match(new RegExp(cmd.match))) !== null) {
-      val = match[1]
-    }
-    if (cmd.acceptJson || cmd.acceptHtml) {
-      let v = vars
-      if (cmd.var) {
-        vars = Object.assign({}, vars)
-        delete vars.out
+    let ops = cmd.op
+    if (ops && !(ops instanceof Array))
+      ops = [ops]
+    for (let j = 0; j < ops.length; j++) {
+      let op = varx(ops[j], vars)
+      let hasChildren = cmd.acceptJson || cmd.acceptHtml || cmd.acceptXml || cmd.use
+      let val = op[0] === '=' ? op.slice(1) : pathFn(op, !(hasChildren && !cmd.match))
+      if (cmd.match && val.match && (match = val.match(new RegExp(cmd.match))) !== null) {
+        val = match[1]
       }
-      this.scan(vars, cmd, val)
+      if (cmd.use && val.length > 0) {
+        let site = this.options[cmd.use]
+        return await this.scan(vars, site, site, node)
+      }
+
+      //
+      // If there is a nested ruleset, process it.
+      //
+      if (hasChildren) {
+        let v = vars
+        if (cmd.var) {
+          vars = Object.assign({}, vars)
+          delete vars.out
+        } else if (val instanceof Array) {
+          val = val.shift()
+        }
+        if (val) {
+          await this.scan(vars, cmd, gg, val)
+          if (cmd.var) {
+            val = vars.out
+            vars = v
+          }
+        }
+      }
+
+      //
+      // See 'assign' method above.
+      //
       if (cmd.var) {
-        val = vars.out
-        vars = v
+        this.assign(vars, {[cmd.var]: val}, vars, cmd.mod)
+      }
+
+      //
+      // If object contains anything at all, no need to run
+      // further ops in a chain.
+      //
+      if (val instanceof Array) {
+        if (val.length > 0)
+          break
+      } else if (val && Object.entries(val).length > 0) {
+        break
       }
     }
-    if (cmd.var)
-			this.assign(vars, {[cmd.var]: val}, vars, cmd.mod)
   }
 }
 
 var reISO = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}(?:\.{0,1}\d*))(?:Z|(\+|-)([\d|:]*))?$/;
-var reMsAjax = /^\/Date\((d|-|.*)\)[\/|\\]$/;
 
 function jsonDateParser(_, value) {
 	var parsedValue = value;
@@ -149,23 +199,29 @@ function jsonDateParser(_, value) {
 		var a = reISO.exec(value);
 		if (a) {
 			parsedValue = new Date(value);
-		} else {
-			a = reMsAjax.exec(value);
-			if (a) {
-				var b = a[1].split(/[-+,.]/);
-				parsedValue = new Date(b[0] ? +b[0] : 0 - +b[1]);
-			}
 		}
-	}
+  }
 	return parsedValue;
 }
 
-F.prototype.scan = async function (vars, site, res) {
-  let obj = res, fn = null, script = null
-  if (obj && typeof(obj.text) === 'function')
-    obj = await obj.text()
-  if (site.acceptJson) {
-    console.log(obj)
+//
+// Scan a document (HTML or JSON) following a site ruleset.
+//
+// vars: A hash to use for storage.
+// site: The ruleset to use.
+// gg: The global ruleset for this site.
+// obj: The document to scan.
+//
+F.prototype.scan = async function (vars, site, gg, obj) {
+  let fn = null, script = null
+  if (site.accept) {
+    for (let i = 0; i < site.accept.length; i++) {
+      await this.scan(vars, this.options[site.accept[i]], gg, obj)
+      if (vars.out)
+        break
+    }
+    return vars
+  } else if (site.acceptJson) {
     if (typeof(obj) === 'string')
       obj = JSON.parse(obj, jsonDateParser)
     script = site.acceptJson
@@ -175,11 +231,11 @@ F.prototype.scan = async function (vars, site, res) {
       return jp.value(obj, path)
     }
 
-  } else if (site.acceptHtml) {
+  } else if (site.acceptHtml || site.acceptXml) {
     if (typeof(obj) === 'string')
       obj = this.parseHtml(obj)
-    script = site.acceptHtml
-    fn = (path) => this.searchHtml(obj, path)
+    script = site.acceptHtml || site.acceptXml
+    fn = (path, asText) => this.searchHtml(obj, path, asText, gg.namespaces)
   }
 
   if (obj instanceof Array) {
@@ -187,19 +243,19 @@ F.prototype.scan = async function (vars, site, res) {
     delete vars.out
     for (let i = 0; i < obj.length; i++) {
       let v = Object.assign({}, vars)
-      this.scan(v, site, obj[i])
+      this.scan(v, site, gg, obj[i])
       out.push(v.out)
     }
     vars.out = out
   } else if (fn) {
-		this.scanScript(vars, script, fn)
+		await this.scanScript(vars, script, gg, obj, fn)
   }
 	return vars
 }
 
 F.prototype.scrape = async function (tasks, req, res) {
   let site = this.options[req.id]
-  let vars = this.scan(tasks.vars, site, res)
+  let vars = await this.scan(tasks.vars, site, site, await res.text())
   vars.rule = req.id
   return vars
 }

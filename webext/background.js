@@ -27,13 +27,25 @@ browser.runtime.onMessage.addListener(async (msg) => {
         return dom.parseFromString(str, 'text/xml')
       }
     },
-    searchHtml: (node, path) => {
-      let x = xpath.parse(path).select({node, allowAnyNamespaceForNoPrefix: true})
-      if (x && path.slice(-1) !== "]") {
-        return x.map(node => node.textContent).join().trim()
+    searchHtml: (node, path, asText, namespaces) => {
+      if (!(path instanceof Array)) {
+        path = [path]
       }
-      console.log(x)
-      return x
+      for (let i = 0; i < path.length; i++) {
+        let p = path[i]
+        try {
+          let x = xpath.parse(p).select({node, allowAnyNamespaceForNoPrefix: true,
+            caseInsensitive: true, namespaces})
+          if (x) {
+            if (asText) {
+              return x.map(node => node.textContent).join('').trim()
+            }
+            return x
+          }
+        } catch (e) {
+          return asText ? "" : []
+        }
+      }
     }
   })
 
