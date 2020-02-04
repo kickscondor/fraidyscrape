@@ -53,7 +53,10 @@ F.prototype.detect = function (url) {
 }
 
 function varx(str, vars) {
-  return typeof(str) === 'string' ? str.replace(/\$(\w+)/g, x => vars[x.slice(1)]) : str
+  return typeof(str) === 'string' ? str.replace(/\$(\w+)/g, x => {
+    let k = x.slice(1)
+    return (k in vars ? vars[k] : x)
+  }) : str
 }
 
 F.prototype.assign = function (options, additions, vars, mods) {
@@ -82,6 +85,9 @@ F.prototype.assign = function (options, additions, vars, mods) {
           val = '#' + encodeURIComponent(val)
         } else if (trans === 'url') {
           val = urlp.resolve(vars['url'], val)
+        } else if (trans.startsWith('valid-now')) {
+          let d = new Date(), field = trans.split(':')[1]
+          val = val.filter(x => x[field] < d)
         } else if (trans.startsWith('*')) {
           val = val * Number(trans.slice(1))
         }

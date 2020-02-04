@@ -62,6 +62,11 @@ browser.runtime.onMessage.addListener(async (msg) => {
 		last = obj.out
   }
 
+  if (last.posts) {
+    last.posts = last.posts.filter(a => 'updatedAt' in a).
+      sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 20)
+  }
+
   return new Promise((resolve, _) => resolve(last))
 })
 
