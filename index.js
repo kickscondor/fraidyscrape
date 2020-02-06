@@ -9,11 +9,12 @@
 const jp = require('jsonpath')
 const normalizeUrl = require('normalize-url')
 const urlp = require('url')
+const xpath = require('xpath')
 
 module.exports = F
 
-function F (options, ext) {
-  if (!(this instanceof F)) return new F (options, ext)
+function F (options, parser) {
+  if (!(this instanceof F)) return new F (options, ext, parser)
   for (let id in options) {
     let site = options[id]
     if (site.match) {
@@ -21,8 +22,56 @@ function F (options, ext) {
     }
   }
   this.options = options
-  Object.assign(this, ext)
+  this.parser = parser
 }
+
+F.prototype.parseHtml = function (str, mimeType) {
+  return this.parser.parseFromString(str, mimeType)
+}
+
+function innerHtml(node) {
+  let v = node.value || node.nodeValue
+  if (v) return v
+
+  if (node.hasChildNodes())
+  {
+    v = ''
+    for (let c = 0; c < node.childNodes.length; c++) {
+      let n = node.childNodes[c]
+      v += n.value || n.nodeValue || n.toString()
+    }
+  }
+  return v
+}
+
+F.prototype.searchHtml = function (node, path, asText, namespaces) {
+  if (!(path instanceof Array)) {
+    path = [path]
+  }
+  for (let i = 0; i < path.length; i++) {
+    let p = path[i]
+    try {
+      let x = xpath.parse(p).select({node, allowAnyNamespaceForNoPrefix: true,
+        caseInsensitive: true, namespaces})
+      if (x) {
+        if (asText) {
+          return x.map(innerHtml).join('').trim()
+        }
+        return x
+      }
+    } catch (e) {
+      return asText ? "" : []
+    }
+  }
+}
+
+async function responseToObject (resp) {
+  let headers = {}   
+  let body = await resp.text()
+  for (let h of resp.headers) 
+    headers[h[0].toLowerCase()] = h[1]
+  return {status: resp.status, ok: resp.ok, url: resp.url, body, headers}  
+}  
 
 function urlToNormal (link) {
   return normalizeUrl(link, {stripProtocol: true, removeDirectoryIndex: true, stripHash: true})
@@ -64,6 +113,7 @@ F.prototype.assign = function (options, additions, vars, mods) {
     let val = additions[id]
     if (!val) continue
 
+    id = varx(id, vars)
     let keys = id.split(':'), node = options
     while (keys.length > 1) {
       if (typeof(node[keys[0]]) !== 'object') {
@@ -78,6 +128,10 @@ F.prototype.assign = function (options, additions, vars, mods) {
       for (let i in mods) {
         let trans = mods[i]
         if (trans === 'date') {
+          if (typeof(val) === 'string' && val.match(/^\d{14,}/)) {
+            val = val.slice(0,4) + "-" + val.slice(4,6) + "-" + val.slice(6,8) +
+              " " + val.slice(8,10) + ":" + val.slice(10,12) + ":" + val.slice(12,14) + "Z"
+          }
           val = new Date(val)
         } else if (trans === 'int') {
           val = Number(val)
@@ -228,8 +282,12 @@ F.prototype.scan = async function (vars, site, gg, obj) {
     }
     return vars
   } else if (site.acceptJson) {
-    if (typeof(obj) === 'string')
+    if (typeof(obj) === 'string') {
+      vars.mime = 'application/json'
       obj = JSON.parse(obj, jsonDateParser)
+    } else if (vars.mime !== 'application/json') {
+      return vars
+    }
     script = site.acceptJson
     fn = (path) => {
       // let found = JSONPath({path, json: obj})
@@ -238,8 +296,12 @@ F.prototype.scan = async function (vars, site, gg, obj) {
     }
 
   } else if (site.acceptHtml || site.acceptXml) {
-    if (typeof(obj) === 'string')
-      obj = this.parseHtml(obj)
+    if (typeof(obj) === 'string') {
+      vars.mime = site.acceptHtml ? 'text/html' : 'text/xml'
+      obj = this.parseHtml(obj, vars.mime)
+    } else if (vars.mime === 'application/json') {
+      return vars
+    }
     script = site.acceptHtml || site.acceptXml
     fn = (path, asText) => this.searchHtml(obj, path, asText, gg.namespaces)
   }
@@ -260,8 +322,19 @@ F.prototype.scan = async function (vars, site, gg, obj) {
 }
 
 F.prototype.scrape = async function (tasks, req, res) {
-  let site = this.options[req.id]
-  let vars = await this.scan(tasks.vars, site, site, await res.text())
+  let site = this.options[req.id], doc
+  res = await responseToObject(res)
+
+  let mime = res.headers['content-type']
+  if (/^\s*{/.test(res.body)) {
+    doc = JSON.parse(res.body, jsonDateParser)
+    mime = 'application/json'
+  } else {
+    doc = this.parseHtml(res.body, /html/.test(mime) ? 'text/html' : 'text/xml')
+  }
+  tasks.vars.mime = mime
+
+  let vars = await this.scan(tasks.vars, site, site, doc)
   vars.rule = req.id
   return vars
 }

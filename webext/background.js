@@ -3,9 +3,7 @@
 //
 import 'babel-polyfill'
 const browser = require('webextension-polyfill')
-const dom = new DOMParser()
 const fraidyscrape = require('..')
-const xpath = require('xpath')
 console.log('Started web extension')
 
 var defs = null
@@ -19,36 +17,7 @@ browser.runtime.onMessage.addListener(async (msg) => {
     console.log(defs)
   }
 
-  let scraper = new fraidyscrape(defs, {
-    parseHtml: str => {
-      try {
-        return dom.parseFromString(str, 'text/html')
-      } catch {
-        return dom.parseFromString(str, 'text/xml')
-      }
-    },
-    searchHtml: (node, path, asText, namespaces) => {
-      if (!(path instanceof Array)) {
-        path = [path]
-      }
-      for (let i = 0; i < path.length; i++) {
-        let p = path[i]
-        try {
-          let x = xpath.parse(p).select({node, allowAnyNamespaceForNoPrefix: true,
-            caseInsensitive: true, namespaces})
-          if (x) {
-            if (asText) {
-              return x.map(node => node.textContent).join('').trim()
-            }
-            return x
-          }
-        } catch (e) {
-          return asText ? "" : []
-        }
-      }
-    }
-  })
-
+  let scraper = new fraidyscrape(defs, new DOMParser())
   let req, last
   console.log(scraper)
   let tasks = scraper.detect(msg.url)
@@ -63,8 +32,8 @@ browser.runtime.onMessage.addListener(async (msg) => {
   }
 
   if (last.posts) {
-    last.posts = last.posts.filter(a => 'updatedAt' in a).
-      sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 20)
+    last.posts = last.posts.filter(a => 'publishedAt' in a).
+      sort((a, b) => b.publishedAt - a.publishedAt).slice(0, 20)
   }
 
   return new Promise((resolve, _) => resolve(last))

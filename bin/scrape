@@ -1,39 +1,12 @@
 #!/usr/bin/env node
-const cheerio = require('cheerio')
 const fetch = require('node-fetch')
 const fraidyscrape = require('..')
 const fs = require('fs')
-const https = require('https')
-const xpath = require('xpath')
 const dom = require('xmldom').DOMParser;
 
 (async function () {
   var url = process.argv[3], req
-  var scraper = new fraidyscrape(JSON.parse(fs.readFileSync(process.argv[2])), {
-    parseHtml: str => {
-      return new dom().parseFromString(str, 'text/xml')
-    },
-    searchHtml: (node, path, asText, namespaces) => {
-      if (!(path instanceof Array)) {
-        path = [path]
-      }
-      for (let i = 0; i < path.length; i++) {
-        let p = path[i]
-        try {
-          let x = xpath.parse(p).select({node, allowAnyNamespaceForNoPrefix: true,
-            caseInsensitive: true, namespaces})
-          if (x) {
-            if (asText) {
-              return x.map(node => node.textContent).join('').trim()
-            }
-            return x
-          }
-        } catch (e) {
-          return asText ? "" : []
-        }
-      }
-    }
-  })
+  var scraper = new fraidyscrape(JSON.parse(fs.readFileSync(process.argv[2])), new dom())
   var tasks = scraper.detect(url)
   console.log(tasks)
 
@@ -44,9 +17,4 @@ const dom = require('xmldom').DOMParser;
 		let obj = await scraper.scrape(tasks, req, res)
 		console.log(obj.out)
   }
-
-  // while (var req = scraper.nextRequest(tasks)) {
-  //   var resp = https.get(url, 
-  //   scraper.scrape(req.id, 
-  // }
 })();
