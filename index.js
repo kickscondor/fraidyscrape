@@ -5,7 +5,6 @@
 // var scraper = new fraidyscrape(options)
 // scraper.
 //
-// const { JSONPath } = require('jsonpath-plus')
 const jp = require('jsonpath')
 const normalizeUrl = require('normalize-url')
 const urlp = require('url')

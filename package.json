@@ -13,16 +13,11 @@
     "build": "fsbin emptyDir dist && parcel build webext/manifest.json"
   },
   "dependencies": {
-    "await-timeout": "^1.1.1",
-    "json-date-parser": "^1.0.1",
     "jsonpath": "^1.0.2",
-    "jsonpath-plus": "^1.1.0",
     "normalize-url": "^4.5.0"
   },
   "devDependencies": {
     "babel-polyfill": "^6.26.0",
-    "cheerio": "^1.0.0-rc.3",
-    "comlink": "^4.2.0",
     "fsbin": "^1.0.9",
     "node-fetch": "^2.6.0",
     "parcel-bundler": "^1.12.4",
