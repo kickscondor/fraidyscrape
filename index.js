@@ -9,12 +9,11 @@
 const jp = require('jsonpath')
 const normalizeUrl = require('normalize-url')
 const urlp = require('url')
-const xpath = require('xpath')
 
 module.exports = F
 
-function F (options, parser) {
-  if (!(this instanceof F)) return new F (options, ext, parser)
+function F (options, parser, xpath, vars) {
+  if (!(this instanceof F)) return new F (options, parser, xpath, vars)
   for (let id in options) {
     let site = options[id]
     if (site.match) {
@@ -23,46 +22,27 @@ function F (options, parser) {
   }
   this.options = options
   this.parser = parser
+  this.xpath = xpath
+  this.vars = vars
 }
 
 F.prototype.parseHtml = function (str, mimeType) {
   return this.parser.parseFromString(str, mimeType)
 }
 
-function innerHtml(node) {
-  let v = node.value || node.nodeValue
-  if (v) return v
-
-  if (node.hasChildNodes())
-  {
-    v = ''
-    for (let c = 0; c < node.childNodes.length; c++) {
-      let n = node.childNodes[c]
-      v += n.value || n.nodeValue || n.toString()
-    }
-  }
-  return v
-}
-
-F.prototype.searchHtml = function (node, path, asText, namespaces) {
+F.prototype.searchHtml = function (node, path, asText, vars) {
   if (!(path instanceof Array)) {
     path = [path]
   }
   for (let i = 0; i < path.length; i++) {
     let p = path[i]
     try {
-      let x = xpath.parse(p).select({node, allowAnyNamespaceForNoPrefix: true,
-        caseInsensitive: true, namespaces})
-      if (x) {
-        if (asText) {
-          return x.map(innerHtml).join('').trim()
-        }
-        return x
-      }
+      let list = this.xpath(vars.doc, node, p, asText, vars.namespaces)
+      return asText ? list.join('').trim() : list
     } catch (e) {
-      return asText ? "" : []
     }
   }
+  return asText ? "" : []
 }
 
 async function responseToObject (resp) {
@@ -83,7 +63,7 @@ F.prototype.detect = function (url) {
     if (!site.match || !(match = norm.match(site.match)))
       continue
 
-    let vars = {url}
+    let vars = Object.assign({url}, this.vars)
     if (site.arguments) {
       for (let i = 0; i < site.arguments.length; i++) {
         let v = site.arguments[i]
@@ -158,12 +138,8 @@ F.prototype.nextRequest = function (tasks) {
 
   let id = tasks.queue.shift()
   let req = this.options[id]
-  let headers = {}
-  if (this.options.agent) {
-    headers['User-Agent'] = this.options.agent
-  }
   let options = this.assign({},
-    {url: req.url || tasks.vars.url, headers, credentials: 'omit'},
+    {url: req.url || tasks.vars.url, headers: {}, credentials: 'omit'},
     tasks.vars)
   if (this.options.domains) {
     this.assign(options, this.options.domains[urlp.parse(options.url).hostname],
@@ -188,11 +164,11 @@ F.prototype.nextRequest = function (tasks) {
 //
 // vars: The hash to store output in.
 // script: The list of commands.
-// gg: Global settings
+// node: The parent node to scan.
 // pathFn: The function to use for xpath or jsonpath or whatever.
 //
 //
-F.prototype.scanScript = async function (vars, script, gg, node, pathFn) {
+F.prototype.scanScript = async function (vars, script, node, pathFn) {
   for (let i = 0; i < script.length; i++) {
     let cmd = script[i]
     let ops = cmd.op
@@ -207,7 +183,7 @@ F.prototype.scanScript = async function (vars, script, gg, node, pathFn) {
       }
       if (cmd.use && val.length > 0) {
         let site = this.options[cmd.use]
-        return await this.scan(vars, site, site, node)
+        return await this.scanSite(vars, site, node)
       }
 
       //
@@ -222,7 +198,7 @@ F.prototype.scanScript = async function (vars, script, gg, node, pathFn) {
           val = val.shift()
         }
         if (val) {
-          await this.scan(vars, cmd, gg, val)
+          await this.scan(vars, cmd, val)
           if (cmd.var) {
             val = vars.out
             vars = v
@@ -269,14 +245,13 @@ function jsonDateParser(_, value) {
 //
 // vars: A hash to use for storage.
 // site: The ruleset to use.
-// gg: The global ruleset for this site.
 // obj: The document to scan.
 //
-F.prototype.scan = async function (vars, site, gg, obj) {
+F.prototype.scan = async function (vars, site, obj) {
   let fn = null, script = null
   if (site.accept) {
     for (let i = 0; i < site.accept.length; i++) {
-      await this.scan(vars, this.options[site.accept[i]], gg, obj)
+      await this.scanSite(vars, this.options[site.accept[i]], obj)
       if (vars.out)
         break
     }
@@ -303,7 +278,7 @@ F.prototype.scan = async function (vars, site, gg, obj) {
       return vars
     }
     script = site.acceptHtml || site.acceptXml
-    fn = (path, asText) => this.searchHtml(obj, path, asText, gg.namespaces)
+    fn = (path, asText) => this.searchHtml(obj, path, asText, vars)
   }
 
   if (obj instanceof Array) {
@@ -311,30 +286,42 @@ F.prototype.scan = async function (vars, site, gg, obj) {
     delete vars.out
     for (let i = 0; i < obj.length; i++) {
       let v = Object.assign({}, vars)
-      this.scan(v, site, gg, obj[i])
+      this.scan(v, site, obj[i])
       out.push(v.out)
     }
     vars.out = out
   } else if (fn) {
-		await this.scanScript(vars, script, gg, obj, fn)
+    setTimeout(() => {1}, 0)
+    await this.scanScript(vars, script, obj, fn)
   }
 	return vars
 }
 
+F.prototype.scanSite = async function (vars, site, obj) {
+  let oldNs = vars.namespaces
+  vars.namespaces = site.namespaces
+
+  let v = await this.scan(vars, site, obj)
+  vars.namespaces = oldNs
+  return v
+}
+
 F.prototype.scrape = async function (tasks, req, res) {
-  let site = this.options[req.id], doc
+  let site = this.options[req.id]
   res = await responseToObject(res)
 
   let mime = res.headers['content-type']
   if (/^\s*{/.test(res.body)) {
-    doc = JSON.parse(res.body, jsonDateParser)
+    tasks.vars.doc = JSON.parse(res.body, jsonDateParser)
     mime = 'application/json'
   } else {
-    doc = this.parseHtml(res.body, /html/.test(mime) ? 'text/html' : 'text/xml')
+    tasks.vars.doc = this.parseHtml(res.body, /html/.test(mime) ? 'text/html' : 'text/xml')
   }
   tasks.vars.mime = mime
 
-  let vars = await this.scan(tasks.vars, site, site, doc)
+  let vars = await this.scanSite(tasks.vars, site, tasks.vars.doc)
+  delete tasks.vars.doc
+
   vars.rule = req.id
   return vars
 }

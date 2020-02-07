@@ -4,6 +4,12 @@
   "version": "1.0",
   "description": "Test Fraidycat's scraper.",
   "homepage_url": "https://github.com/kickscondor/fraidyscrape",
+  "content_scripts": [
+    {
+      "matches": ["https://fraidyc.at/scrape/"],
+      "js": ["index.js"]
+    }
+  ],
   "web_accessible_resources": [
     "index.html"
   ],

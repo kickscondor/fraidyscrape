@@ -2,11 +2,36 @@
 const fetch = require('node-fetch')
 const fraidyscrape = require('..')
 const fs = require('fs')
-const dom = require('xmldom').DOMParser;
+const dom = require('xmldom').DOMParser
+const xpath = require('xpath');
+
+function innerHtml(node) {
+  let v = node.value || node.nodeValue
+  if (v) return v
+
+  if (node.hasChildNodes())
+  {
+    v = ''
+    for (let c = 0; c < node.childNodes.length; c++) {
+      let n = node.childNodes[c]
+      v += n.value || n.nodeValue || n.toString()
+    }
+  }
+  return v
+}
+
+function xpathSelect(doc, node, path, asText, namespaces) {
+  let result = xpath.parse(path).select({node, allowAnyNamespaceForNoPrefix: true,
+    caseInsensitive: true, namespaces})
+  if (asText)
+    return result.map(innerHtml)
+  return result
+}
 
 (async function () {
   var url = process.argv[3], req
-  var scraper = new fraidyscrape(JSON.parse(fs.readFileSync(process.argv[2])), new dom())
+  var scraper = new fraidyscrape(JSON.parse(fs.readFileSync(process.argv[2])),
+    new dom(), xpathSelect, {useragent: 'User-Agent'})
   var tasks = scraper.detect(url)
   console.log(tasks)
 
