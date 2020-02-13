@@ -101,5 +101,5 @@ browser.webRequest.onBeforeSendHeaders.addListener(rewriteUserAgentHeader,
   {urls: ["<all_urls>"], types: ["xmlhttprequest"]}, ["blocking", "requestHeaders"])
 
 browser.browserAction.onClicked.addListener(tab => {
-  browser.tabs.create({url: 'index.html'})
+  browser.tabs.create({url: 'https://fraidyc.at/scrape/'})
 })
