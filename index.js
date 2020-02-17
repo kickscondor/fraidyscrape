@@ -69,7 +69,7 @@ F.prototype.detect = function (url) {
         if (typeof(v) === 'string') {
           vars[v] = match[i]
         } else if (typeof(v) === 'object') {
-          vars[v.var] = match[i]
+          this.assign(vars, {[v.var]: match[i]}, vars, v.mod)
         }
       }
     }
@@ -123,6 +123,10 @@ F.prototype.assign = function (options, additions, vars, mods) {
           val = val.filter(x => x[field] < d)
         } else if (trans.startsWith('*')) {
           val = val * Number(trans.slice(1))
+        } else if (trans === 'lowercase') {
+          val = val.toString().toLowerCase()
+        } else if (trans === 'uppercase') {
+          val = val.toString().toUpperCase()
         }
 			}
 		}
@@ -261,12 +265,7 @@ F.prototype.scan = async function (vars, site, obj) {
       return vars
     }
     script = site.acceptJson
-    fn = (path) => {
-      // let found = JSONPath({path, json: obj})
-      // return found && found[0]
-      return jp.value(obj, path)
-    }
-
+    fn = (path, asText) => jp[asText ? 'value' : 'query'](obj, path)
   } else if (site.acceptHtml || site.acceptXml) {
     if (typeof(obj) === 'string') {
       vars.mime = site.acceptHtml ? 'text/html' : 'text/xml'
