@@ -145,10 +145,8 @@ F.prototype.nextRequest = function (tasks) {
       tasks.vars)
   }
 
-  // TODO: Actually batch
-  if (req.batch) {
-    let mods = req.batch[1]
-    this.assign(options, mods, tasks.vars)
+  if (req.request) {
+    this.assign(options, req.request, tasks.vars)
   }
 
   let url = urlp.parse(options.url)
