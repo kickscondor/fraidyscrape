@@ -1,0 +1,23 @@
+# IDE
+.idea/
+.vscode/
+
+# Temp storage
+.cache
+
+# Logs
+*.log*
+yarn.lock
+package-lock.json
+
+# Misc
+example
+node_modules
+coverage
+*.txt
+*.html
+*.xml
+
+# Dist
+*.gz
+dist/
