@@ -52,7 +52,7 @@ browser.runtime.onMessage.addListener(async (msg) => {
 
     let scraper = new fraidyscrape(defs, new DOMParser(), xpath,
       {useragent: 'X-FC-User-Agent'})
-    let req, last
+    let req, last, now = new Date()
     console.log(scraper)
     let tasks = scraper.detect(msg.url)
     console.log(tasks)
@@ -66,8 +66,8 @@ browser.runtime.onMessage.addListener(async (msg) => {
     }
 
     if (last.posts) {
-      last.posts = last.posts.filter(a => 'publishedAt' in a).
-        sort((a, b) => b.publishedAt - a.publishedAt).slice(0, 20)
+      last.posts = last.posts.filter(a => a.updatedAt && a.updatedAt <= now).
+        sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 20)
     }
 
     return last

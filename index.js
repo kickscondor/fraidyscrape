@@ -90,8 +90,6 @@ function varx(str, vars) {
 F.prototype.assign = function (options, additions, vars, mods) {
   for (let id in additions) {
     let val = additions[id]
-    if (!val) continue
-
     id = varx(id, vars)
     let keys = id.split(':'), node = options
     while (keys.length > 1) {
@@ -100,6 +98,11 @@ F.prototype.assign = function (options, additions, vars, mods) {
       }
       node = node[keys[0]]
       keys.shift()
+    }
+
+    if (!val) {
+      delete node[keys[0]]
+      continue
     }
 
     val = varx(val, vars)
@@ -173,36 +176,43 @@ F.prototype.scanScript = async function (vars, script, node, pathFn) {
   for (let i = 0; i < script.length; i++) {
     let cmd = script[i]
     let ops = cmd.op
-    if (ops && !(ops instanceof Array))
+    if (!(ops instanceof Array))
       ops = [ops]
     for (let j = 0; j < ops.length; j++) {
       let op = varx(ops[j], vars)
-      let hasChildren = cmd.acceptJson || cmd.acceptHtml || cmd.acceptXml || cmd.use
-      let val = op[0] === '=' ? op.slice(1) : pathFn(op, !(hasChildren && !cmd.match))
-      if (cmd.match && val.match && (match = val.match(new RegExp(cmd.match))) !== null) {
-        val = match[1]
-      }
-      if (cmd.use && val.length > 0) {
-        let site = this.options[cmd.use]
-        return await this.scanSite(vars, site, node)
-      }
-
-      //
-      // If there is a nested ruleset, process it.
-      //
-      if (hasChildren) {
-        let v = vars
-        if (cmd.var) {
-          vars = Object.assign({}, vars)
-          delete vars.out
-        } else if (val instanceof Array) {
-          val = val.shift()
+      let val = null
+      if (op) {
+        let hasChildren = cmd.acceptJson || cmd.acceptHtml || cmd.acceptXml || cmd.patch || cmd.use
+        val = op[0] === '=' ? op.slice(1) : pathFn(op, !(hasChildren && !cmd.match))
+        if (cmd.match) {
+          if (val.match && (match = val.match(new RegExp(cmd.match))) !== null) {
+            val = match[1] || val
+          } else {
+            continue
+          }
         }
-        if (val) {
-          await this.scan(vars, cmd, val)
+        if (cmd.use && val.length > 0) {
+          let site = this.options[cmd.use]
+          return await this.scanSite(vars, site, node)
+        }
+
+        //
+        // If there is a nested ruleset, process it.
+        //
+        if (hasChildren) {
+          let v = vars
           if (cmd.var) {
-            val = vars.out
-            vars = v
+            vars = Object.assign({}, vars)
+            delete vars.out
+          } else if (val instanceof Array) {
+            val = val.shift()
+          }
+          if (val) {
+            await this.scan(vars, cmd, val)
+            if (cmd.var) {
+              val = vars.out
+              vars = v
+            }
           }
         }
       }
@@ -249,15 +259,17 @@ function jsonDateParser(_, value) {
 // obj: The document to scan.
 //
 F.prototype.scan = async function (vars, site, obj) {
-  let fn = null, script = null
+  let script = null
+  let fn = (path, asText) => jp[asText ? 'value' : 'query'](obj, path)
   if (site.accept) {
     for (let i = 0; i < site.accept.length; i++) {
       await this.scanSite(vars, this.options[site.accept[i]], obj)
       if (vars.out)
         break
     }
-    return vars
-  } else if (site.acceptJson) {
+  }
+
+  if (site.acceptJson) {
     if (typeof(obj) === 'string') {
       vars.mime = 'application/json'
       obj = JSON.parse(obj, jsonDateParser)
@@ -265,7 +277,6 @@ F.prototype.scan = async function (vars, site, obj) {
       return vars
     }
     script = site.acceptJson
-    fn = (path, asText) => jp[asText ? 'value' : 'query'](obj, path)
   } else if (site.acceptHtml || site.acceptXml) {
     if (typeof(obj) === 'string') {
       vars.mime = site.acceptHtml ? 'text/html' : 'text/xml'
@@ -275,21 +286,28 @@ F.prototype.scan = async function (vars, site, obj) {
     }
     script = site.acceptHtml || site.acceptXml
     fn = (path, asText) => this.searchHtml(obj, path, asText, vars)
+  } else if (site.patch) {
+    script = site.patch
+    if (!site.op)
+      obj = vars.out
   }
 
-  if (obj instanceof Array) {
-    let out = []
-    delete vars.out
-    for (let i = 0; i < obj.length; i++) {
-      let v = Object.assign({}, vars)
-      this.scan(v, site, obj[i])
-      out.push(v.out)
+  if (script) {
+    if (obj instanceof Array) {
+      let out = []
+      delete vars.out
+      for (let i = 0; i < obj.length; i++) {
+        let v = Object.assign({}, vars)
+        this.scan(v, site, obj[i])
+        out.push(v.out)
+      }
+      vars.out = out
+    } else if (fn) {
+      setTimeout(() => {1}, 0)
+      await this.scanScript(vars, script, obj, fn)
     }
-    vars.out = out
-  } else if (fn) {
-    setTimeout(() => {1}, 0)
-    await this.scanScript(vars, script, obj, fn)
   }
+
 	return vars
 }
 
