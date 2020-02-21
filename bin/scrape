@@ -31,7 +31,7 @@ function xpathSelect(doc, node, path, asText, namespaces) {
 (async function () {
   var url = process.argv[3], req
   var scraper = new fraidyscrape(JSON.parse(fs.readFileSync(process.argv[2])),
-    new dom(), xpathSelect, {useragent: 'User-Agent'})
+    new dom(), xpathSelect)
   var tasks = scraper.detect(url)
   console.log(tasks)
 

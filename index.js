@@ -22,7 +22,7 @@ function F (options, parser, xpath, vars) {
   this.options = options
   this.parser = parser
   this.xpath = xpath
-  this.vars = vars
+  this.vars = vars || {}
 }
 
 F.prototype.parseHtml = function (str, mimeType) {
@@ -175,6 +175,13 @@ F.prototype.nextRequest = function (tasks) {
 F.prototype.scanScript = async function (vars, script, node, pathFn) {
   for (let i = 0; i < script.length; i++) {
     let cmd = script[i]
+    if (cmd.rule) {
+      let rule = vars.rules && vars.rules[cmd.rule]
+      if (rule) {
+        this.scanScript(vars, rule, node, pathFn)
+      }
+    }
+
     let ops = cmd.op
     if (!(ops instanceof Array))
       ops = [ops]
@@ -192,8 +199,8 @@ F.prototype.scanScript = async function (vars, script, node, pathFn) {
           }
         }
         if (cmd.use && val.length > 0) {
-          let site = this.options[cmd.use]
-          return await this.scanSite(vars, site, node)
+          let use = this.options[cmd.use]
+          return await this.scanSite(vars, use, node)
         }
 
         //
@@ -312,11 +319,13 @@ F.prototype.scan = async function (vars, site, obj) {
 }
 
 F.prototype.scanSite = async function (vars, site, obj) {
-  let oldNs = vars.namespaces
+  let oldNs = vars.namespaces, oldRules = vars.rules
   vars.namespaces = site.namespaces
+  vars.rules = site.rules
 
   let v = await this.scan(vars, site, obj)
   vars.namespaces = oldNs
+  vars.rules = oldRules
   return v
 }
 
