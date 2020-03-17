@@ -8,6 +8,7 @@
 const jp = require('jsonpath')
 const normalizeUrl = require('normalize-url')
 const urlp = require('url')
+const unkZones = require('./unkZones.js')
 
 module.exports = F
 
@@ -108,11 +109,18 @@ F.prototype.assign = function (options, additions, vars, mods) {
     val = varx(val, vars)
     if (typeof(mods) === 'object') {
       for (let i in mods) {
-        let trans = mods[i]
+        let trans = mods[i], match
         if (trans === 'date') {
-          if (typeof(val) === 'string' && val.match(/^\d{14,}/)) {
-            val = val.slice(0,4) + "-" + val.slice(4,6) + "-" + val.slice(6,8) +
-              " " + val.slice(8,10) + ":" + val.slice(10,12) + ":" + val.slice(12,14) + "Z"
+          if (typeof(val) === 'string') {
+            if (val.match(/^\d{14,}/)) {
+              val = val.slice(0,4) + "-" + val.slice(4,6) + "-" + val.slice(6,8) +
+                " " + val.slice(8,10) + ":" + val.slice(10,12) + ":" + val.slice(12,14) + "Z"
+            } else if ((match = val.match(/^(.+) ([A-Z]{2,5})$/)) !== null) {
+              let z = unkZones[match[2]]
+              if (z) {
+                val = match[1] + " " + unkZones[match[2]]
+              }
+            }
           }
           val = new Date(val)
         } else if (trans === 'int') {
