@@ -1,43 +1,22 @@
 //
 // webext/background.js
 //
-import 'babel-polyfill'
+import 'regenerator-runtime/runtime'
+import { xpath } from './util' 
 const browser = require('webextension-polyfill')
 const fraidyscrape = require('..')
 console.log('Started web extension')
 
 var defs = null
+var watch = []
 
-function innerHtml(node) {
-  let v = node.value || node.nodeValue
-  if (v) return v
-
-  if (node.hasChildNodes())
-  {
-    v = ''
-    for (let c = 0; c < node.childNodes.length; c++) {
-      let n = node.childNodes[c]
-      v += n.value || n.nodeValue || n.innerHTML
-    }
-  }
-  return v
-}
-
-function xpath(doc, node, path, asText, ns) {
-  let lookup = null
-  if (ns) lookup = (pre) => ns[pre]
-  let result = doc.evaluate(path, node, lookup, 4, null), list = []
-  if (result) {
-    while (true) {
-      let node = result.iterateNext()
-      if (node) {
-        list.push(asText ? innerHtml(node) : node)
-      } else {
-        break
-      }
-    }
-  }
-  return list
+async function render(url, id, site, tasks) {
+  let ifrm = document.createElement("iframe")
+  ifrm.src = url
+  ifrm.addEventListener('load', e => {
+    ifrm.contentWindow.postMessage({tasks, id, site}, '*')
+  })
+  document.body.appendChild(ifrm)
 }
 
 browser.runtime.onMessage.addListener(async (msg) => {
@@ -45,7 +24,7 @@ browser.runtime.onMessage.addListener(async (msg) => {
     console.log(msg)
 
     if (defs === null) {
-      var soc = await fetch("https://fraidyc.at/defs/social.json")
+      var soc = await fetch("https://huh.fraidyc.at/defs/social.json")
       defs = JSON.parse(await soc.text())
       console.log(defs)
     }
@@ -59,10 +38,15 @@ browser.runtime.onMessage.addListener(async (msg) => {
 
     while (req = scraper.nextRequest(tasks)) {
       console.log(req)
-      let res = await fetch(req.url, req.options)
-      // console.log(res)
-      let obj = await scraper.scrape(tasks, req, res)
-      last = obj.out
+      if (req.render) {
+        let ary = req.render.map(id => scraper.options[id])
+        watch.push(ary)
+        last = (await render(req.url, req.id, scraper.options[req.id], tasks)).out
+      } else {
+        let res = await fetch(req.url, req.options)
+        // console.log(res)
+        last = (await scraper.scrape(tasks, req, res)).out
+      }
     }
 
     if (last.posts) {
@@ -99,6 +83,39 @@ function rewriteUserAgentHeader(e) {
 
 browser.webRequest.onBeforeSendHeaders.addListener(rewriteUserAgentHeader,
   {urls: ["<all_urls>"], types: ["xmlhttprequest"]}, ["blocking", "requestHeaders"])
+
+function rewriteFrameOptHeader(e) {
+  let initiator = e.initiator || e.originUrl
+  let headers = e.responseHeaders
+  if (e.tabId === -1 && initiator && extUrl && (initiator + "/").startsWith(extUrl)) {
+    for (let i = headers.length - 1; i >= 0; --i) {
+      let header = headers[i].name.toLowerCase()
+      if (header == 'x-frame-options' || header == 'frame-options') {
+        headers.splice(i, 1)
+      }
+    }
+  }
+  return {responseHeaders: headers};
+}
+
+browser.webRequest.onHeadersReceived.addListener(rewriteFrameOptHeader,
+  {urls: ["<all_urls>"]}, ["blocking", "responseHeaders"])
+
+function checkCompleted(e) {
+  let headers = e.responseHeaders
+  // TODO: match frame id
+  if (e.tabId === -1 && e.parentFrameId === 0) {
+    let url = urlToNormal(e.url)
+    for (let renders of watch) {
+      let match = renders.filter(render => url.match(render.match))
+      if (match) {
+      }
+    }
+  }
+}
+
+browser.webRequest.onCompleted.addListener(checkCompleted,
+  {urls: ["<all_urls>"], types: ["xmlhttprequest"]}, ["responseHeaders"])
 
 browser.browserAction.onClicked.addListener(tab => {
   browser.tabs.create({url: 'https://fraidyc.at/scrape/'})

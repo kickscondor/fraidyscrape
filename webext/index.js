@@ -1,9 +1,9 @@
-import 'babel-polyfill'
+import 'regenerator-runtime/runtime'
 const browser = require('webextension-polyfill')
 const ppj = require('pretty-print-json')
 const u = require('umbrellajs')
 
-async function callFetch(e) {
+u('button').on('click', e => {
   let ele = e.currentTarget
   e.preventDefault()
   ele.disabled = true
@@ -15,8 +15,4 @@ async function callFetch(e) {
       u('#response').html(ppj.toHtml(msg))
       ele.disabled = false
     })
-}
-
-window.addEventListener("load", async () => {
-  u('button').on('click', callFetch)
-}, false)
+})
