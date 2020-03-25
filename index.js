@@ -120,7 +120,7 @@ F.prototype.detect = function (url) {
         if (typeof(v) === 'string') {
           vars[v] = match[i]
         } else if (typeof(v) === 'object') {
-          this.assign(vars, {[v.var]: match[i]}, vars, v.mod)
+          this.assign(vars, {[v.var]: match[i]}, vars, v.mod, true)
         }
       }
     }
@@ -147,7 +147,7 @@ function varx(str, vars) {
   }).replace(/\$([:\w]+)/g, x => varr(vars, x.slice(1))) : str
 }
 
-F.prototype.assign = function (options, additions, vars, mods) {
+F.prototype.assign = function (options, additions, vars, mods, plainValue) {
   for (let id in additions) {
     let val = additions[id]
     id = varx(id, vars)
@@ -165,7 +165,8 @@ F.prototype.assign = function (options, additions, vars, mods) {
       continue
     }
 
-    val = varx(val, vars)
+    if (!plainValue)
+      val = varx(val, vars)
     if (typeof(mods) === 'object') {
       for (let i in mods) {
         let trans = mods[i], match
@@ -305,7 +306,7 @@ F.prototype.scanScript = async function (vars, script, node, pathFn) {
       // See 'assign' method above.
       //
       if (cmd.var && cmd.var !== "*") {
-        this.assign(vars, {[cmd.var]: val}, vars, cmd.mod)
+        this.assign(vars, {[cmd.var]: val}, vars, cmd.mod, true)
       }
 
       //
