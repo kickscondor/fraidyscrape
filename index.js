@@ -19,11 +19,19 @@ function F (options, parser, xpath, vars) {
     if (site.match) {
       site.match = new RegExp(site.match)
     }
+    if (site.render) {
+      for (let r of site.render) {
+        if (r.match) {
+          r.match = new RegExp(r.match)
+        }
+      }
+    }
   }
   this.options = options
   this.parser = parser
   this.xpath = xpath
   this.vars = vars || {}
+  this.watch = {}
 }
 
 F.prototype.parseHtml = function (str, mimeType) {
@@ -57,6 +65,48 @@ function urlToNormal (link) {
   return normalizeUrl(link, {stripProtocol: true, removeDirectoryIndex: true, stripHash: true})
 }
 
+F.prototype.addWatch = function (url, entry) {
+  this.watch[url] = entry
+}
+
+F.prototype.removeWatch = function(url, entry) {
+  if (entry.resolve) {
+    entry.resolve(entry.tasks.vars)
+  }
+  delete this.watch[url]
+  entry.remove()
+}
+
+F.prototype.updateWatch = function(url, entry, tasks, error) {
+  entry.tasks = tasks
+  if (error) {
+    entry.reject(error)
+    delete entry.resolve
+  }
+  if (entry.render.length === 0 || error) {
+    this.removeWatch(url, entry)
+  }
+}
+
+F.prototype.lookupWatch = async function (url, fn) {
+  let norm = urlToNormal(url)
+  for (let wurl in this.watch) {
+    let w = this.watch[wurl]
+    for (let r of w.render) {
+      if (r.match) {
+        let m = norm.match(r.match)
+        if (m && (!r.validate ||
+          r.validate.map(v => w.tasks.vars[v]).join("|") === m.slice(1).join("|")))
+        {
+          await fn(r, w.tasks)
+          w.render = w.render.filter(wr => wr !== r)
+          this.updateWatch(wurl, w, w.tasks)
+        }
+      }
+    }
+  }
+}
+
 F.prototype.detect = function (url) {
   for (let id in this.options) {
     let site = this.options[id], match = null, norm = urlToNormal(url)
@@ -81,11 +131,20 @@ F.prototype.detect = function (url) {
   return {queue: ["default"], vars: {url}}
 }
 
+function varr(vars, x) {
+  let k = x.split(':')
+  while (vars && k.length > 0) {
+    vars = vars[k.shift()]
+  }
+  return vars || ''
+}
+
 function varx(str, vars) {
-  return typeof(str) === 'string' ? str.replace(/\$(\w+)/g, x => {
-    let k = x.slice(1)
-    return (k in vars ? vars[k] : x)
-  }) : str
+  return typeof(str) === 'string' ? str.replace(/\${(.+)}/g, x => {
+    let k = x.slice(2, -1)
+    let v = `${varx(k, vars)}`
+    return varr(vars, v)
+  }).replace(/\$([:\w]+)/g, x => varr(vars, x.slice(1))) : str
 }
 
 F.prototype.assign = function (options, additions, vars, mods) {
@@ -151,7 +210,12 @@ F.prototype.nextRequest = function (tasks) {
     return
 
   let id = tasks.queue.shift()
-  let req = this.options[id]
+  let req = this.setupRequest(tasks, this.options[id])
+  req.id = id
+  return req
+}
+
+F.prototype.setupRequest = function (tasks, req) {
   let options = this.assign({},
     {url: req.url || tasks.vars.url, headers: {}, credentials: 'omit'},
     tasks.vars)
@@ -168,7 +232,8 @@ F.prototype.nextRequest = function (tasks) {
   url.query = options.query
   delete options.url
   delete options.query
-  return {url: urlp.format(url), id, options}
+  return {url: urlp.format(url), options,
+    render: req.render && req.render.concat()}
 }
 
 //
@@ -186,7 +251,7 @@ F.prototype.scanScript = async function (vars, script, node, pathFn) {
     if (cmd.rule) {
       let rule = vars.rules && vars.rules[cmd.rule]
       if (rule) {
-        this.scanScript(vars, rule, node, pathFn)
+        await this.scanScript(vars, rule, node, pathFn)
       }
     }
 
@@ -206,7 +271,7 @@ F.prototype.scanScript = async function (vars, script, node, pathFn) {
             continue
           }
         }
-        if (cmd.use && val.length > 0) {
+        if (this.options && cmd.use && val.length > 0) {
           let use = this.options[cmd.use]
           return await this.scanSite(vars, use, node)
         }
@@ -217,16 +282,20 @@ F.prototype.scanScript = async function (vars, script, node, pathFn) {
         if (hasChildren) {
           let v = vars
           if (cmd.var) {
-            vars = Object.assign({}, vars)
-            delete vars.out
+            if (cmd.var !== "*") {
+              vars = Object.assign({}, vars)
+              delete vars.out
+            }
           } else if (val instanceof Array) {
             val = val.shift()
           }
           if (val) {
             await this.scan(vars, cmd, val)
             if (cmd.var) {
-              val = vars.out
-              vars = v
+              if (cmd.var !== "*") {
+                val = vars.out
+                vars = v
+              }
             }
           }
         }
@@ -235,7 +304,7 @@ F.prototype.scanScript = async function (vars, script, node, pathFn) {
       //
       // See 'assign' method above.
       //
-      if (cmd.var) {
+      if (cmd.var && cmd.var !== "*") {
         this.assign(vars, {[cmd.var]: val}, vars, cmd.mod)
       }
 
@@ -285,9 +354,14 @@ F.prototype.scan = async function (vars, site, obj) {
   }
 
   if (site.acceptJson) {
+    if (obj.innerHTML) {
+      obj = obj.innerHTML
+    }
     if (typeof(obj) === 'string') {
       vars.mime = 'application/json'
       obj = JSON.parse(obj, jsonDateParser)
+    } else if (!vars.mime) {
+      vars.mime = 'application/json'
     } else if (vars.mime !== 'application/json') {
       return vars
     }
@@ -295,7 +369,8 @@ F.prototype.scan = async function (vars, site, obj) {
   } else if (site.acceptHtml || site.acceptXml) {
     if (typeof(obj) === 'string') {
       vars.mime = site.acceptHtml ? 'text/html' : 'text/xml'
-      obj = this.parseHtml(obj, vars.mime)
+    } else if (!vars.mime) {
+      vars.mime = site.acceptHtml ? 'text/html' : 'text/xml'
     } else if (vars.mime === 'application/json') {
       return vars
     }
@@ -310,13 +385,16 @@ F.prototype.scan = async function (vars, site, obj) {
   if (script) {
     if (obj instanceof Array) {
       let out = []
-      delete vars.out
+      if (site.var !== "*")
+        delete vars.out
       for (let i = 0; i < obj.length; i++) {
-        let v = Object.assign({}, vars)
-        this.scan(v, site, obj[i])
-        out.push(v.out)
+        let v = (site.var === "*" ? vars : Object.assign({}, vars))
+        await this.scan(v, site, obj[i])
+        if (site.var !== "*")
+          out.push(v.out)
       }
-      vars.out = out
+      if (site.var !== "*")
+        vars.out = out
     } else if (fn) {
       setTimeout(() => {1}, 0)
       await this.scanScript(vars, script, obj, fn)
@@ -337,8 +415,7 @@ F.prototype.scanSite = async function (vars, site, obj) {
   return v
 }
 
-F.prototype.scrape = async function (tasks, req, res) {
-  let site = this.options[req.id]
+F.prototype.scrapeRule = async function (tasks, res, site) {
   res = await responseToObject(res)
 
   let mime = res.headers['content-type']
@@ -349,10 +426,23 @@ F.prototype.scrape = async function (tasks, req, res) {
     tasks.vars.doc = this.parseHtml(res.body, /html/.test(mime) ? 'text/html' : 'text/xml')
   }
   tasks.vars.mime = mime
+  // console.log([tasks, res, site])
 
   let vars = await this.scanSite(tasks.vars, site, tasks.vars.doc)
   delete tasks.vars.doc
+  return vars
+}
 
+F.prototype.scrape = async function (tasks, req, res) {
+  let site = this.options[req.id]
+  let vars = await this.scrapeRule(tasks, res, site)
   vars.rule = req.id
+  return vars
+}
+
+F.prototype.scrapeRender = async function (tasks, site, win) {
+  tasks.vars.doc = site.acceptJson ? win : win.document
+  let vars = await this.scanSite(tasks.vars, site, tasks.vars.doc)
+  delete tasks.vars.doc
   return vars
 }

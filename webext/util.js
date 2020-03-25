@@ -1,5 +1,7 @@
+const ent = require('ent/decode')
+
 function innerHtml(node) {
-  let v = node.value || node.nodeValue
+  let v = node.value || (node.nodeValue && ent(node.nodeValue))
   if (v) return v
 
   if (node.hasChildNodes())
@@ -7,7 +9,7 @@ function innerHtml(node) {
     v = ''
     for (let c = 0; c < node.childNodes.length; c++) {
       let n = node.childNodes[c]
-      v += n.value || n.nodeValue || n.innerHTML
+      v += n.value || (n.nodeValue && ent(n.nodeValue)) || n.innerHTML
     }
   }
   return v
