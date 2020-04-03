@@ -69,22 +69,28 @@ F.prototype.addWatch = function (url, entry) {
   this.watch[url] = entry
 }
 
-F.prototype.removeWatch = function(url, entry) {
-  if (entry.resolve) {
-    entry.resolve(entry.tasks.vars)
+F.prototype.removeWatch = function(url) {
+  let entry = this.watch[url]
+  if (entry) {
+    if (entry.resolve) {
+      entry.resolve(entry.tasks ? entry.tasks.vars : {})
+    }
+    delete this.watch[url]
+    entry.remove()
   }
-  delete this.watch[url]
-  entry.remove()
 }
 
-F.prototype.updateWatch = function(url, entry, tasks, error) {
-  entry.tasks = tasks
-  if (error) {
-    entry.reject(error)
-    delete entry.resolve
-  }
-  if (entry.render.length === 0 || error) {
-    this.removeWatch(url, entry)
+F.prototype.updateWatch = function(url, tasks, error) {
+  let entry = this.watch[url]
+  if (entry) {
+    entry.tasks = tasks
+    if (error) {
+      entry.reject(error)
+      delete entry.resolve
+    }
+    if (entry.render.length === 0 || error) {
+      this.removeWatch(url)
+    }
   }
 }
 
@@ -100,7 +106,7 @@ F.prototype.lookupWatch = async function (url, fn) {
         {
           await fn(r, w.tasks)
           w.render = w.render.filter(wr => wr !== r)
-          this.updateWatch(wurl, w, w.tasks)
+          this.updateWatch(wurl, w.tasks)
         }
       }
     }
