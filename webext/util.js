@@ -18,15 +18,13 @@ function innerHtml(node) {
 export function xpath(doc, node, path, asText, ns) {
   let lookup = null
   if (ns) lookup = (pre) => ns[pre]
-  let result = doc.evaluate(path, node, lookup, 4, null), list = []
-  if (result) {
-    while (true) {
-      let node = result.iterateNext()
-      if (node) {
-        list.push(asText ? innerHtml(node) : node)
-      } else {
-        break
-      }
+  let result = doc.evaluate(path, node, lookup, 7, null), list = []
+  for (let i = 0; i < result.snapshotLength; i++) {
+    let node = result.snapshotItem(i)
+    if (node) {
+      list.push(asText ? innerHtml(node) : node)
+    } else {
+      break
     }
   }
   return list

@@ -430,6 +430,9 @@ F.prototype.scrapeRule = async function (tasks, res, site) {
     tasks.vars.doc = JSON.parse(res.body, jsonDateParser)
     mime = 'application/json'
   } else {
+    if (/^\s*<\?xml\s+/.test(res.body)) {
+      mime = 'text/xml'
+    }
     tasks.vars.doc = this.parseHtml(res.body, /html/.test(mime) ? 'text/html' : 'text/xml')
   }
   tasks.vars.mime = mime
