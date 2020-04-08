@@ -25,5 +25,18 @@
   "browser_action": {
     "default_title": "Fraidycat"
   },
-  "permissions": ["http://*/", "https://*/", "tabs", "webRequest", "webRequestBlocking"]
+  "permissions": [
+    "http://*/",
+    "https://*/",
+    "https://m.facebook.com/*",
+    "https://*.fbcdn.net/*",
+    "https://www.instagram.com/*",
+    "https://www.reddit.com/*",
+    "https://pbs.twimg.com/*",
+    "https://twitter.com/*",
+    "tabs",
+    "unlimitedStorage",
+    "webRequest",
+    "webRequestBlocking"
+  ]
 }
