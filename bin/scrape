@@ -29,10 +29,14 @@ function xpathSelect(doc, node, path, asText, namespaces) {
   return result
 }
 
+function parseDom(str, mime) {
+  return new dom().parseFromString(str, mime)
+}
+
 (async function () {
   var url = process.argv[3], req
   var scraper = new fraidyscrape(JSON.parse(fs.readFileSync(process.argv[2])),
-    new dom(), xpathSelect)
+    parseDom, xpathSelect)
   var tasks = scraper.detect(url)
   console.log(tasks)
 

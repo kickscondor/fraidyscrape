@@ -2,7 +2,7 @@
 // webext/background.js
 //
 import 'regenerator-runtime/runtime'
-import { xpath } from './util' 
+import { xpath, parseDom } from './util' 
 const browser = require('webextension-polyfill')
 const fraidyscrape = require('..')
 console.log('Started web extension')
@@ -47,7 +47,7 @@ browser.runtime.onMessage.addListener(async (msg) => {
     if (defs === null) {
       var soc = await fetch("https://huh.fraidyc.at/defs/social.json")
       defs = JSON.parse(await soc.text())
-      scraper = new fraidyscrape(defs, new DOMParser(), xpath)
+      scraper = new fraidyscrape(defs, parseDom, xpath)
       console.log(defs)
     }
 

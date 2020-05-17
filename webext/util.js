@@ -30,3 +30,6 @@ export function xpath(doc, node, path, asText, ns) {
   return list
 }
 
+export function parseDom(str, mime) {
+  return (new DOMParser()).parseFromString(str, mime)
+}

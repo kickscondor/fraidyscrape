@@ -35,7 +35,7 @@ function F (options, parser, xpath, vars) {
 }
 
 F.prototype.parseHtml = function (str, mimeType) {
-  return this.parser.parseFromString(str, mimeType)
+  return this.parser(str, mimeType)
 }
 
 F.prototype.searchHtml = function (node, path, asText, vars) {
@@ -181,7 +181,7 @@ F.prototype.assign = function (options, additions, vars, mods, plainValue) {
             if (val.match(/^\d{14,}/)) {
               val = val.slice(0,4) + "-" + val.slice(4,6) + "-" + val.slice(6,8) +
                 " " + val.slice(8,10) + ":" + val.slice(10,12) + ":" + val.slice(12,14) + "Z"
-            } else if ((match = val.match(/^(.+) ([A-Z]{2,5})$/)) !== null) {
+            } else if ((match = val.match(/^(.+) ([A-Z]{1,5})$/)) !== null) {
               let z = unkZones[match[2]]
               if (z) {
                 val = match[1] + " " + unkZones[match[2]]
@@ -430,7 +430,8 @@ F.prototype.scrapeRule = async function (tasks, res, site) {
     tasks.vars.doc = JSON.parse(res.body, jsonDateParser)
     mime = 'application/json'
   } else {
-    if (/^\s*<\?xml\s+.+<(rss|atom)/.test(res.body)) {
+    // The [\s\S] matches ANY char - while the dot (,) doesn't match newlines
+    if (/^\s*<\?xml\s+[\s\S]+<(rss|atom)/i.test(res.body)) {
       mime = 'text/xml'
     }
     tasks.vars.doc = this.parseHtml(res.body, /html/.test(mime) ? 'text/html' : 'text/xml')

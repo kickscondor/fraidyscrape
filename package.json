@@ -1,7 +1,7 @@
 {
   "name": "fraidyscrape",
   "description": "Scrape HTML and JSON APIs using JSON definition files.",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "module": "index.js",
   "license": "MIT",
   "repository": "kickscondor/fraidyscrape",
@@ -25,7 +25,7 @@
     "parcel-bundler": "^1.12.4",
     "parcel-plugin-web-extension": "^1.6.1",
     "pretty-print-json": "^0.2.1",
-    "sass": "^1.26.3",
+    "sass": "^1.26.5",
     "umbrellajs": "^3.1.0",
     "webextension-polyfill": "^0.6.0",
     "xmldom": "^0.1.27",
