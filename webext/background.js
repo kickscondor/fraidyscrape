@@ -14,9 +14,9 @@ async function render(req, tasks) {
   let iframe = document.createElement("iframe")
   iframe.src = req.url
   return new Promise((resolve, reject) => {
+    scraper.addWatch(req.url, {tasks, resolve, reject, iframe, render: req.render,
+      remove: () => {}}) // document.body.removeChild(iframe)})
     iframe.addEventListener('load', e => {
-      scraper.addWatch(req.url, {tasks, resolve, reject, iframe, render: req.render,
-        remove: () => document.body.removeChild(iframe)})
       iframe.contentWindow.postMessage({url: req.url, tasks, site}, '*')
     })
     document.body.appendChild(iframe)
@@ -26,7 +26,7 @@ async function render(req, tasks) {
 
 window.addEventListener('message', e => {
   let {url, tasks, error} = e.data
-  scraper.updateWatch(url, scraper.watch[url], tasks, error)
+  scraper.updateWatch(url, tasks, error)
 }, false)
 
 function fixupHeaders (options, list) {
