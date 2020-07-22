@@ -426,8 +426,11 @@ F.prototype.scrapeRule = async function (tasks, res, site) {
   res = await responseToObject(res)
 
   let mime = res.headers['content-type']
-  if (/^\s*{/.test(res.body)) {
+  if (/^\s*[{\[]/.test(res.body)) {
     tasks.vars.doc = JSON.parse(res.body, jsonDateParser)
+    if (tasks.vars.doc instanceof Array) {
+      tasks.vars.doc = {list: tasks.vars.doc}
+    }
     mime = 'application/json'
   } else {
     // The [\s\S] matches ANY char - while the dot (,) doesn't match newlines

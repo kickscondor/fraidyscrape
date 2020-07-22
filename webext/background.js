@@ -15,12 +15,12 @@ async function render(req, tasks) {
   iframe.src = req.url
   return new Promise((resolve, reject) => {
     scraper.addWatch(req.url, {tasks, resolve, reject, iframe, render: req.render,
-      remove: () => {}}) // document.body.removeChild(iframe)})
+      remove: () => document.body.removeChild(iframe)})
     iframe.addEventListener('load', e => {
       iframe.contentWindow.postMessage({url: req.url, tasks, site}, '*')
     })
     document.body.appendChild(iframe)
-    setTimeout(() => scraper.removeWatch(req.url, scraper.watch[req.url]), 40000)
+    setTimeout(() => scraper.removeWatch(req.url), 40000)
   })
 }
 
@@ -45,7 +45,7 @@ browser.runtime.onMessage.addListener(async (msg) => {
     console.log(msg)
 
     if (defs === null) {
-      var soc = await fetch("https://huh.fraidyc.at/defs/social.json")
+      var soc = await fetch("https://fraidyc.at/defs/social.json")
       defs = JSON.parse(await soc.text())
       scraper = new fraidyscrape(defs, parseDom, xpath)
       console.log(defs)
@@ -80,7 +80,7 @@ browser.runtime.onMessage.addListener(async (msg) => {
 let extUrl = browser.extension.getURL("/")
 function rewriteUserAgentHeader(e) {
   let initiator = e.initiator || e.originUrl
-  if (e.tabId === -1 && initiator && extUrl && (initiator + "/").startsWith(extUrl)) {
+  if (e.tabId === -1) {
     let hdrs = [], ua = null
     for (var header of e.requestHeaders) {
       let name = header.name.toLowerCase()
@@ -105,7 +105,7 @@ browser.webRequest.onBeforeSendHeaders.addListener(rewriteUserAgentHeader,
 function rewriteFrameOptHeader(e) {
   let initiator = e.initiator || e.originUrl
   let headers = e.responseHeaders
-  if (e.tabId === -1 && initiator && extUrl && (initiator + "/").startsWith(extUrl)) {
+  if (e.tabId === -1) {
     for (let i = headers.length - 1; i >= 0; --i) {
       let header = headers[i].name.toLowerCase()
       if (header == 'x-frame-options' || header == 'frame-options') {

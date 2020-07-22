@@ -43,7 +43,7 @@ function parseDom(str, mime) {
   while (req = scraper.nextRequest(tasks)) {
 		console.log(req)
 		let res = await fetch(req.url, req.options)
-		// console.log(res)
+		// console.log(await res.text())
 		let obj = await scraper.scrape(tasks, req, res)
 		console.log(obj.out)
   }
