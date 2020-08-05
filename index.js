@@ -195,6 +195,10 @@ F.prototype.assign = function (options, additions, vars, mods, plainValue) {
           val = '#' + encodeURIComponent(val)
         } else if (trans === 'url') {
           val = urlp.resolve(vars['url'], val)
+        } else if (trans === 'decode-uri') {
+          val = decodeURI(val)
+        } else if (trans === 'encode-uri') {
+          val = encodeURI(val)
         } else if (trans.startsWith('valid-now')) {
           let d = new Date(), field = trans.split(':')[1]
           val = val.filter(x => x[field] < d)
@@ -269,7 +273,7 @@ F.prototype.scanScript = async function (vars, script, node, pathFn) {
       let op = varx(ops[j], vars)
       let val = null
       if (op) {
-        let hasChildren = cmd.acceptJson || cmd.acceptHtml || cmd.acceptXml || cmd.patch || cmd.use
+        let hasChildren = cmd.acceptJson || cmd.acceptText || cmd.acceptHtml || cmd.acceptXml || cmd.patch || cmd.use
         val = op[0] === '=' ? op.slice(1) : pathFn(op, !(hasChildren && !cmd.match))
         if (cmd.match) {
           if (val.match && (match = val.match(new RegExp(cmd.match))) !== null) {
@@ -373,6 +377,31 @@ F.prototype.scan = async function (vars, site, obj) {
       return vars
     }
     script = site.acceptJson
+  } else if (site.acceptText) {
+    if (obj.innerText) {
+      obj = obj.innerText
+    }
+    if (typeof(obj) === 'string' || !vars.mime) {
+      vars.mime = 'text/plain'
+    } else if (vars.mime !== 'text/plain') {
+      return vars
+    }
+    obj = obj.toString()
+    script = site.acceptText
+    fn = function (path, asText) {
+      let match = null
+      if (asText) {
+        if ((match = obj.match(new RegExp(path, 'm'))) !== null) {
+          return match[1] || obj
+        }
+      } else {
+        let re = new RegExp(path, 'mg'), ary = []
+        while ((match = re.exec(obj)) !== null) {
+          ary.push(Object.assign({}, match.groups))
+        }
+        return ary
+      }
+    }
   } else if (site.acceptHtml || site.acceptXml) {
     if (typeof(obj) === 'string') {
       vars.mime = site.acceptHtml ? 'text/html' : 'text/xml'
@@ -432,12 +461,15 @@ F.prototype.scrapeRule = async function (tasks, res, site) {
       tasks.vars.doc = {list: tasks.vars.doc}
     }
     mime = 'application/json'
-  } else {
+  } else if (/^\s*</m.test(res.body)) {
     // The [\s\S] matches ANY char - while the dot (,) doesn't match newlines
     if (/^\s*<\?xml\s+[\s\S]+<(rss|atom)/i.test(res.body)) {
       mime = 'text/xml'
     }
     tasks.vars.doc = this.parseHtml(res.body, /html/.test(mime) ? 'text/html' : 'text/xml')
+  } else {
+    mime = 'text/plain'
+    tasks.vars.doc = res.body
   }
   tasks.vars.mime = mime
   // console.log([tasks, res, site])
