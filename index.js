@@ -5,6 +5,7 @@
 // var scraper = new fraidyscrape(options)
 // scraper.
 //
+const entDecode = require('ent/decode')
 const jp = require('jsonpath')
 const normalizeUrl = require('normalize-url')
 const urlp = require('url')
@@ -199,11 +200,20 @@ F.prototype.assign = function (options, additions, vars, mods, plainValue) {
           val = decodeURI(val)
         } else if (trans === 'encode-uri') {
           val = encodeURI(val)
+        } else if (trans === 'html-to-text') {
+          val = entDecode(val)
         } else if (trans.startsWith('valid-now')) {
           let d = new Date(), field = trans.split(':')[1]
           val = val.filter(x => x[field] < d)
         } else if (trans.startsWith('*')) {
           val = val * Number(trans.slice(1))
+        } else if (trans.startsWith('[')) {
+          let m = varx(trans, vars).slice(1, -1).split(',')
+          val = val.slice(Number(m[0]), m[1] && (Number(m[1]) + 1))
+        } else if (trans.startsWith('s/')) {
+          let m = trans.slice(2).split(/(?<!\\)\//, 3)
+          val = val.replace(new RegExp(m[0], m[2] || ''), (m[1] || '').replace(/\\\//g, "/"))
+          val = varx(val, vars)
         } else if (trans === 'lowercase') {
           val = val.toString().toLowerCase()
         } else if (trans === 'uppercase') {
@@ -266,15 +276,21 @@ F.prototype.scanScript = async function (vars, script, node, pathFn) {
       }
     }
 
-    let ops = cmd.op
+    let ops = cmd.op, val = null
     if (!(ops instanceof Array))
       ops = [ops]
     for (let j = 0; j < ops.length; j++) {
       let op = varx(ops[j], vars)
-      let val = null
       if (op) {
         let hasChildren = cmd.acceptJson || cmd.acceptText || cmd.acceptHtml || cmd.acceptXml || cmd.patch || cmd.use
-        val = op[0] === '=' ? op.slice(1) : pathFn(op, !(hasChildren && !cmd.match))
+        let asText = !(hasChildren && !cmd.match)
+        if (op[0] === '=') {
+          val = op.slice(1)
+        } else if (op[0] === '&') {
+          val = jp[asText ? 'value' : 'query'](vars, '$' + op.slice(1))
+        } else {
+          val = pathFn(op, asText)
+        }
         if (cmd.match) {
           if (val.match && (match = val.match(new RegExp(cmd.match))) !== null) {
             val = match[1] || val
@@ -313,13 +329,6 @@ F.prototype.scanScript = async function (vars, script, node, pathFn) {
       }
 
       //
-      // See 'assign' method above.
-      //
-      if (cmd.var && cmd.var !== "*") {
-        this.assign(vars, {[cmd.var]: val}, vars, cmd.mod, true)
-      }
-
-      //
       // If object contains anything at all, no need to run
       // further ops in a chain.
       //
@@ -329,6 +338,13 @@ F.prototype.scanScript = async function (vars, script, node, pathFn) {
       } else if (val && Object.entries(val).length > 0) {
         break
       }
+    }
+
+    //
+    // See 'assign' method above.
+    //
+    if (cmd.var && cmd.var !== "*") {
+      this.assign(vars, {[cmd.var]: val}, vars, cmd.mod, true)
     }
   }
 }
