@@ -182,6 +182,8 @@ F.prototype.assign = function (options, additions, vars, mods, plainValue) {
             if (val.match(/^\d{14,}/)) {
               val = val.slice(0,4) + "-" + val.slice(4,6) + "-" + val.slice(6,8) +
                 " " + val.slice(8,10) + ":" + val.slice(10,12) + ":" + val.slice(12,14) + "Z"
+            } else if (val.match(/^\w+\s+\d{1,2}[a-z]*$/)) {
+              val = val + ", " + (new Date()).getFullYear()
             } else if ((match = val.match(/^(.+) ([A-Z]{1,5})$/)) !== null) {
               let z = unkZones[match[2]]
               if (z) {
