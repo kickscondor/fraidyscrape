@@ -443,6 +443,7 @@ F.prototype.scan = async function (vars, site, obj) {
         delete vars.out
       for (let i = 0; i < obj.length; i++) {
         let v = (site.var === "*" ? vars : Object.assign({}, vars))
+        v.index = i.toString()
         await this.scan(v, site, obj[i])
         if (site.var !== "*")
           out.push(v.out)
