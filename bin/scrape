@@ -36,8 +36,8 @@ function parseDom(str, mime) {
 
 (async function () {
   var url = process.argv[3], req, obj
-  var scraper = new fraidyscrape(JSON.parse(fs.readFileSync(process.argv[2])),
-    parseDom, xpathSelect)
+  var rules = JSON.parse(fs.readFileSync(process.argv[2]))
+  var scraper = new fraidyscrape(rules, parseDom, xpathSelect)
   if (url.includes("://")) {
     var tasks = scraper.detect(url)
     console.log(tasks)
@@ -49,6 +49,11 @@ function parseDom(str, mime) {
       obj = await scraper.scrape(tasks, req, res)
       console.log(util.inspect(obj.out, false, null, true))
     }
+  } else if (url in rules) {
+    let html = fs.readFileSync(process.argv[4], 'utf-8')
+    let vars = {mime: 'text/html'}
+    vars.doc = scraper.parseHtml(html, vars.mime)
+    console.log(await scraper.scanSite(vars, rules[url], vars.doc))
   } else {
     var exp = JSON.parse(fs.readFileSync(url))
     for (let f of Object.values(exp.follows)) {

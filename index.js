@@ -474,23 +474,25 @@ F.prototype.scrapeRule = async function (tasks, res, site) {
   res = await responseToObject(res)
 
   let mime = res.headers['content-type']
-  if (/^\s*[{\[]/.test(res.body)) {
-    tasks.vars.doc = JSON.parse(res.body, jsonDateParser)
+  let body = res.body.trim()
+  if (/^\s*[{\[]/.test(body)) {
+    tasks.vars.doc = JSON.parse(body, jsonDateParser)
     if (tasks.vars.doc instanceof Array) {
       tasks.vars.doc = {list: tasks.vars.doc}
     }
     mime = 'application/json'
-  } else if (/^\s*</m.test(res.body)) {
+  } else if (/^\s*</m.test(body)) {
     // The [\s\S] matches ANY char - while the dot (,) doesn't match newlines
-    if (/^\s*<\?xml\s+[\s\S]+<(rss|atom)/i.test(res.body)) {
+    if (/^\s*<\?xml\s+[\s\S]+<(rss|atom)/i.test(body)) {
       mime = 'text/xml'
     }
-    tasks.vars.doc = this.parseHtml(res.body, /html/.test(mime) ? 'text/html' : 'text/xml')
+    tasks.vars.doc = this.parseHtml(body, /html/.test(mime) ? 'text/html' : 'text/xml')
   } else {
     mime = 'text/plain'
-    tasks.vars.doc = res.body
+    tasks.vars.doc = body
   }
   tasks.vars.mime = mime
+  console.log(tasks.vars.doc)
   // console.log([tasks, res, site])
 
   let vars = await this.scanSite(tasks.vars, site, tasks.vars.doc)
