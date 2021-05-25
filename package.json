@@ -1,7 +1,7 @@
 {
   "name": "fraidyscrape",
   "description": "Scrape HTML and JSON APIs using JSON definition files.",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "module": "index.js",
   "license": "MIT",
   "repository": "kickscondor/fraidyscrape",
