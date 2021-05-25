@@ -67,6 +67,7 @@ function urlToNormal (link) {
 }
 
 F.prototype.addWatch = function (url, entry) {
+  entry.externs = []
   this.watch[url] = entry
 }
 
@@ -89,9 +90,25 @@ F.prototype.updateWatch = function(url, tasks, error) {
       entry.reject(error)
       delete entry.resolve
     }
+    if (typeof(entry.externs) !== 'undefined') {
+      for (let ext of entry.externs) {
+        this.processExtern(url, entry, ext[0], ext[1], ext[2])
+      }
+      delete entry.externs
+    }
     if (entry.render.length === 0 || error) {
       this.removeWatch(url)
     }
+  }
+}
+
+F.prototype.processExtern = async function (watchUrl, watch, render, match, fn) {
+  if (!render.validate ||
+    render.validate.map(v => watch.tasks.vars[v]).join("|") === match.slice(1).join("|"))
+  {
+    await fn(render, watch.tasks)
+    watch.render = watch.render.filter(wr => wr !== render)
+    this.updateWatch(watchUrl, watch.tasks)
   }
 }
 
@@ -102,12 +119,12 @@ F.prototype.lookupWatch = async function (url, fn) {
     for (let r of w.render) {
       if (r.match) {
         let m = norm.match(r.match)
-        if (m && (!r.validate ||
-          r.validate.map(v => w.tasks.vars[v]).join("|") === m.slice(1).join("|")))
-        {
-          await fn(r, w.tasks)
-          w.render = w.render.filter(wr => wr !== r)
-          this.updateWatch(wurl, w.tasks)
+        if (m) {
+          if (typeof(w.externs) !== 'undefined') {
+            w.externs.push([r, m, fn])
+          } else {
+            this.processExtern(wurl, w, r, m, fn)
+          }
         }
       }
     }

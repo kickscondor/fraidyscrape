@@ -19,6 +19,7 @@ u('button').on('click', e => {
   console.log(url)
   browser.runtime.sendMessage({url, at: new Date()}).
     then((msg) => {
-      u('#response').html(escapeHtml(JSON.stringify(msg, null, 2)))
+      u('#response').html(escapeHtml(
+        JSON.stringify(msg, null, 2) || "{}"))
     })
 })

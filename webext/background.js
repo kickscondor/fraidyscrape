@@ -26,6 +26,7 @@ async function render(req, tasks) {
 
 window.addEventListener('message', e => {
   let {url, tasks, error} = e.data
+  console.log(e.data)
   scraper.updateWatch(url, tasks, error)
 }, false)
 
