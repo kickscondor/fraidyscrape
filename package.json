@@ -1,7 +1,7 @@
 {
   "name": "fraidyscrape",
   "description": "Scrape HTML and JSON APIs using JSON definition files.",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "module": "index.js",
   "license": "MIT",
   "repository": "kickscondor/fraidyscrape",
@@ -14,21 +14,21 @@
   },
   "dependencies": {
     "ent": "^2.2.0",
-    "jsonpath": "^1.0.2",
-    "normalize-url": "^4.5.0",
+    "jsonpath": "^1.1.1",
+    "normalize-url": "^6.0.1",
     "regenerator-runtime": "^0.13.7"
   },
   "devDependencies": {
     "babel-polyfill": "^6.26.0",
     "fsbin": "^1.0.10",
     "node-fetch": "^2.6.1",
-    "parcel-bundler": "^1.12.4",
+    "parcel-bundler": "^1.12.5",
     "parcel-plugin-web-extension": "^1.6.1",
-    "pretty-print-json": "^0.2.4",
-    "sass": "^1.32.0",
+    "pretty-print-json": "^1.0.0",
+    "sass": "^1.34.0",
     "umbrellajs": "^3.2.3",
-    "webextension-polyfill": "^0.6.0",
-    "xmldom": "^0.1.27",
-    "xpath": "0.0.27"
+    "webextension-polyfill": "^0.8.0",
+    "xmldom": "^0.6.0",
+    "xpath": "^0.0.32"
   }
 }

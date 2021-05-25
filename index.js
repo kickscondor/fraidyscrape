@@ -192,6 +192,8 @@ F.prototype.assign = function (options, additions, vars, mods, plainValue) {
             }
           }
           val = new Date(val)
+        } else if (trans === 'ago') {
+          val = new Date(new Date() - val)
         } else if (trans === 'int') {
           val = Number(val)
         } else if (trans === 'slug') {
@@ -211,15 +213,17 @@ F.prototype.assign = function (options, additions, vars, mods, plainValue) {
           val = val * Number(trans.slice(1))
         } else if (trans.startsWith('[')) {
           let m = varx(trans, vars).slice(1, -1).split(',')
-          val = val.slice(Number(m[0]), m[1] && (Number(m[1]) + 1))
+          val = val.toString().slice(Number(m[0]), m[1] && (Number(m[1]) + 1))
         } else if (trans.startsWith('s/')) {
           let m = trans.slice(2).split(/(?<!\\)\//, 3)
-          val = val.replace(new RegExp(m[0], m[2] || ''), (m[1] || '').replace(/\\\//g, "/"))
+          val = val.toString().replace(new RegExp(m[0], m[2] || ''), (m[1] || '').replace(/\\\//g, "/"))
           val = varx(val, vars)
         } else if (trans === 'lowercase') {
           val = val.toString().toLowerCase()
         } else if (trans === 'uppercase') {
           val = val.toString().toUpperCase()
+        } else if (trans === 'str') {
+          val = val.toString()
         }
 			}
 		}
@@ -492,7 +496,6 @@ F.prototype.scrapeRule = async function (tasks, res, site) {
     tasks.vars.doc = body
   }
   tasks.vars.mime = mime
-  console.log(tasks.vars.doc)
   // console.log([tasks, res, site])
 
   let vars = await this.scanSite(tasks.vars, site, tasks.vars.doc)
