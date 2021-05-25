@@ -108,7 +108,7 @@ function rewriteFrameOptHeader(e) {
   if (e.tabId === -1) {
     for (let i = headers.length - 1; i >= 0; --i) {
       let header = headers[i].name.toLowerCase()
-      if (header == 'x-frame-options' || header == 'frame-options') {
+      if (header == 'x-frame-options' || header == 'frame-options' || header == 'content-security-policy') {
         headers.splice(i, 1)
       }
     }
@@ -117,7 +117,7 @@ function rewriteFrameOptHeader(e) {
 }
 
 browser.webRequest.onHeadersReceived.addListener(rewriteFrameOptHeader,
-  {urls: ["<all_urls>"]}, ["blocking", "responseHeaders"])
+  {urls: ["<all_urls>"]}, ["blocking", "responseHeaders", "extraHeaders"])
 
 async function checkCompleted(e) {
   let headers = e.responseHeaders

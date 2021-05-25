@@ -1,7 +1,15 @@
 import 'regenerator-runtime/runtime'
 const browser = require('webextension-polyfill')
-const ppj = require('pretty-print-json')
 const u = require('umbrellajs')
+
+function escapeHtml(unsafe) {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
 
 u('button').on('click', e => {
   let ele = e.currentTarget
@@ -11,6 +19,6 @@ u('button').on('click', e => {
   console.log(url)
   browser.runtime.sendMessage({url, at: new Date()}).
     then((msg) => {
-      u('#response').html(ppj.toHtml(msg))
+      u('#response').html(escapeHtml(JSON.stringify(msg, null, 2)))
     })
 })
