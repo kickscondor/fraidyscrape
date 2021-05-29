@@ -9,13 +9,13 @@ if (window.self !== window.top) {
   let extURL = browser.extension.getURL('/').replace(/\/$/, '')
 
   window.addEventListener('message', async e => {
-    let {tasks, site, url} = e.data
+    let {tasks, site, url} = JSON.parse(e.data)
     let error = null
     try {
       await scraper.scrapeRender(tasks, site, window)
-    } catch {
-      error = "Couldn't find a follow at this location."
+    } catch (e) {
+      error = e.message + " " + e.fileName + ":" + e.lineNumber + ":" + e.columnNumber
     }
-    e.source.postMessage({tasks, url, error}, extURL)
+    e.source.postMessage(JSON.stringify({tasks, url, error}), extURL)
   })
 }

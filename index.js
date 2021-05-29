@@ -515,8 +515,12 @@ F.prototype.scrapeRule = async function (tasks, res, site) {
   tasks.vars.mime = mime
   // console.log([tasks, res, site])
 
-  let vars = await this.scanSite(tasks.vars, site, tasks.vars.doc)
-  delete tasks.vars.doc
+  let vars = {}
+  try {
+    vars = await this.scanSite(tasks.vars, site, tasks.vars.doc)
+  } finally {
+    delete tasks.vars.doc
+  }
   return vars
 }
 
@@ -529,7 +533,11 @@ F.prototype.scrape = async function (tasks, req, res) {
 
 F.prototype.scrapeRender = async function (tasks, site, win) {
   tasks.vars.doc = site.acceptJson ? win : win.document
-  let vars = await this.scanSite(tasks.vars, site, tasks.vars.doc)
-  delete tasks.vars.doc
+  let vars = {}
+  try {
+    vars = await this.scanSite(tasks.vars, site, tasks.vars.doc)
+  } finally {
+    delete tasks.vars.doc
+  }
   return vars
 }

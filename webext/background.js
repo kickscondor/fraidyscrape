@@ -17,7 +17,7 @@ async function render(req, tasks) {
     scraper.addWatch(req.url, {tasks, resolve, reject, iframe, render: req.render,
       remove: () => document.body.removeChild(iframe)})
     iframe.addEventListener('load', e => {
-      iframe.contentWindow.postMessage({url: req.url, tasks, site}, '*')
+      iframe.contentWindow.postMessage(JSON.stringify({url: req.url, tasks, site}), '*')
     })
     document.body.appendChild(iframe)
     setTimeout(() => scraper.removeWatch(req.url), 40000)
@@ -25,7 +25,7 @@ async function render(req, tasks) {
 }
 
 window.addEventListener('message', e => {
-  let {url, tasks, error} = e.data
+  let {url, tasks, error} = JSON.parse(e.data)
   console.log(e.data)
   scraper.updateWatch(url, tasks, error)
 }, false)
@@ -117,8 +117,13 @@ function rewriteFrameOptHeader(e) {
   return {responseHeaders: headers}
 }
 
-browser.webRequest.onHeadersReceived.addListener(rewriteFrameOptHeader,
-  {urls: ["<all_urls>"]}, ["blocking", "responseHeaders", "extraHeaders"])
+try {
+  browser.webRequest.onHeadersReceived.addListener(rewriteFrameOptHeader,
+    {urls: ["<all_urls>"]}, ["blocking", "responseHeaders", "extraHeaders"])
+} catch {
+  browser.webRequest.onHeadersReceived.addListener(rewriteFrameOptHeader,
+    {urls: ["<all_urls>"]}, ["blocking", "responseHeaders"])
+}
 
 async function checkCompleted(e) {
   let headers = e.responseHeaders
