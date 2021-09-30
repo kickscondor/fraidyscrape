@@ -9,6 +9,7 @@
 *.log*
 yarn.lock
 package-lock.json
+pnpm-lock.json
 
 # Misc
 example
