@@ -3,7 +3,7 @@ const ent = require('ent/decode')
 const fetch = require('node-fetch')
 const fraidyscrape = require('..')
 const fs = require('fs')
-const dom = require('xmldom').DOMParser
+const { DOMParser, XMLSerializer } = require('@xmldom/xmldom')
 const util = require('util')
 const xpath = require('xpath');
 
@@ -31,7 +31,28 @@ function xpathSelect(doc, node, path, asText, namespaces) {
 }
 
 function parseDom(str, mime) {
-  return new dom().parseFromString(str, mime)
+  return new DOMParser().parseFromString(str, mime)
+}
+
+function parseDomFragment(str, mime) {
+  let frag = false
+  str = str.trim()
+  if (str[0] !== '<') {
+    frag = true
+    str = "<div>" + str + "</div>"
+  }
+  let doc = new DOMParser().parseFromString(str, mime)
+  if (frag) {
+    let docf = doc.createDocumentFragment()
+    let cn = doc.childNodes[0].firstChild
+    while (cn) {
+      let sib = cn.nextSibling
+      docf.appendChild(cn)
+      cn = sib
+    }
+    return docf
+  }
+  return doc
 }
 
 (async function () {
@@ -45,9 +66,18 @@ function parseDom(str, mime) {
     while (req = scraper.nextRequest(tasks)) {
       console.log(req)
       let res = await fetch(req.url, req.options)
-      // console.log(await res.text())
-      obj = await scraper.scrape(tasks, req, res)
-      console.log(util.inspect(obj.out, false, null, true))
+      if (!res.ok) {
+        console.log(`${req.url} is giving a ${res.status} error.`)
+      } else {
+        // console.log(await res.text())
+        obj = await scraper.scrape(tasks, req, res)
+        if (obj.out && res.headers) {
+          obj.out.etag = res.headers.get('etag')
+            || res.headers.get('last-modified')
+            || res.headers.get('date')
+        }
+        console.log(util.inspect(obj.out, false, null, true))
+      }
     }
   } else if (url in rules) {
     let html = fs.readFileSync(process.argv[4], 'utf-8')

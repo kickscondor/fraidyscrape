@@ -6,7 +6,8 @@
 // scraper.
 //
 const entDecode = require('ent/decode')
-const jp = require('jsonpath')
+const entEncode = require('ent/encode')
+const jp = require('jsonpath/jsonpath.min.js')
 const normalizeUrl = require('normalize-url')
 const urlp = require('url')
 const unkZones = require('./unkZones.js')
@@ -223,6 +224,8 @@ F.prototype.assign = function (options, additions, vars, mods, plainValue) {
           val = encodeURI(val)
         } else if (trans === 'html-to-text') {
           val = entDecode(val)
+        } else if (trans === 'text-to-html') {
+          val = entEncode(val)
         } else if (trans.startsWith('valid-now')) {
           let d = new Date(), field = trans.split(':')[1]
           val = val.filter(x => x[field] < d)

@@ -1,7 +1,7 @@
 {
   "name": "fraidyscrape",
   "description": "Scrape HTML and JSON APIs using JSON definition files.",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "module": "index.js",
   "license": "MIT",
   "repository": "kickscondor/fraidyscrape",
@@ -13,6 +13,8 @@
     "build": "fsbin emptyDir dist && parcel build --no-minify webext/manifest.json"
   },
   "dependencies": {
+    "@xmldom/xmldom": "^0.7.5",
+    "electron-fetch": "^1.7.4",
     "ent": "^2.2.0",
     "jsonpath": "^1.1.1",
     "normalize-url": "^6.0.1",
